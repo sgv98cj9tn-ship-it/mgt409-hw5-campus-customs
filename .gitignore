@@ -1,0 +1,21 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv
+.venv.nosync/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+
+# course download (holds the original database again; the two .db files are included)
+data/data.zip

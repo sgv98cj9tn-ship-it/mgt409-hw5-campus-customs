@@ -1,0 +1,59 @@
+{
+  "server": "campus-customs-ops",
+  "transport": "stdio (FastMCP), called from Claude Code as mcp__campus-customs-ops__<tool>",
+  "date_run": "2026-11-03",
+  "database": "Homework 5/data/campus_customs_new.db (opened read-only)",
+  "today_source": "desk.date_today = 2026-08-31",
+  "verification_method": "Each tool output was checked with read-only sqlite3 queries (URI file:data/campus_customs_new.db?mode=ro).",
+  "tests": [
+    {
+      "prompt": "Give me information for Classic Bulldog Tee in medium.",
+      "tool": "check_product",
+      "arguments": {"sku": "CC-TEE-WHITE", "size": "M"},
+      "output": {"today":"2026-08-31","found":true,"products":[{"sku":"CC-TEE-WHITE","name":"Classic Bulldog Tee","list_price":28,"unit_cost":8,"margin_per_unit":20,"sizes":[{"size":"M","qty":5,"location":"Aisle B","in_stock":true}],"total_qty":5}]},
+      "db_check": {
+        "sql": "SELECT i.sku, i.name, i.size, i.qty, i.location, p.list_price, p.unit_cost FROM inventory i JOIN pricing p ON p.sku = i.sku WHERE i.sku = 'CC-TEE-WHITE' AND i.size = 'M';",
+        "result": [{"sku":"CC-TEE-WHITE","name":"Classic Bulldog Tee","size":"M","qty":5,"location":"Aisle B","list_price":28.0,"unit_cost":8.0}],
+        "matches": true,
+        "notes": "qty 5, Aisle B, list price $28 match. margin_per_unit 20 = 28 - 8."
+      }
+    },
+    {
+      "prompt": "Which vendor should I use to order more t-shirts?",
+      "tool": "lookup_vendor",
+      "arguments": {"specialty": "apparel"},
+      "output": {"today":"2026-08-31","found":true,"vendors":[{"id":1,"name":"Bulldog Print Co","specialty":"apparel reprint","lead_days":5,"ready_if_ordered_today":"2026-09-05"}]},
+      "db_check": {
+        "sql": "SELECT id, name, specialty, lead_days, date((SELECT date_today FROM desk), '+' || lead_days || ' days') AS ready_if_ordered_today FROM vendors WHERE specialty LIKE '%apparel%';",
+        "result": [{"id":1,"name":"Bulldog Print Co","specialty":"apparel reprint","lead_days":5,"ready_if_ordered_today":"2026-09-05"}],
+        "matches": true,
+        "notes": "Only apparel vendor is 1 Bulldog Print Co, 5 lead days; 2026-08-31 + 5 days = 2026-09-05."
+      }
+    },
+    {
+      "prompt": "Are there any outstanding payments as of today?",
+      "tool": "review_outgoing_payments",
+      "arguments": {"days_ahead": 30},
+      "arguments_note": "days_ahead left at its default of 30.",
+      "output": {"today":"2026-08-31","days_ahead":30,"cash_accounts":[{"name":"checking","balance":3400,"as_of":"2026-08-31"}],"total_cash":3400,"payments_made":[],"payments_needed":[{"kind":"invoice","ref_id":501,"payee":"Bulldog Print Co","vendor_id":1,"description":"Rush reprint CC-TEE-WHITE S","amount":840,"due_date":"2026-08-28","invoice_status":"open","days_until_due":-3,"overdue":true},{"kind":"rent","ref_id":1,"payee":"Elm City Properties","description":"Rent for Chapel Street shop","amount":2400,"due_date":"2026-09-02","days_until_due":2,"overdue":false}],"total_needed":3240,"enough_cash_for_all":true,"cash_left_after_paying_all":160,"shortfall":0,"due_later":[],"payments_table_rows":0},
+      "db_check": {
+        "sql": [
+          "SELECT date_today FROM desk;",
+          "SELECT id, vendor_id, amount, due_date, status, description FROM invoices WHERE status <> 'paid';",
+          "SELECT id, landlord, space_name, monthly_rent, next_due FROM leases;",
+          "SELECT COUNT(*) AS payment_rows FROM payments;",
+          "SELECT name, balance, date FROM cash_accounts;"
+        ],
+        "result": {
+          "desk": [{"date_today":"2026-08-31"}],
+          "unpaid_invoices": [{"id":501,"vendor_id":1,"amount":840.0,"due_date":"2026-08-28","status":"open","description":"Rush reprint CC-TEE-WHITE S"}],
+          "leases": [{"id":1,"landlord":"Elm City Properties","space_name":"Chapel Street shop","monthly_rent":2400.0,"next_due":"2026-09-02"}],
+          "payments": [{"payment_rows":0}],
+          "cash_accounts": [{"name":"checking","balance":3400.0,"date":"2026-08-31"}]
+        },
+        "matches": true,
+        "notes": "Payments table is empty, so invoice 501 (open, due 2026-08-28, 3 days overdue) and lease 1 rent (due 2026-09-02) are both unpaid. 840 + 2400 = 3240 owed vs 3400 in checking, leaving 160."
+      }
+    }
+  ]
+}
